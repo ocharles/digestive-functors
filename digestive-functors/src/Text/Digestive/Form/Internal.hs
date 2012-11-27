@@ -73,6 +73,8 @@ data FormTree t v m a where
 
     Monadic :: t (FormTree t v m a) -> FormTree t v m a
 
+    List :: Ref -> FormTree t v m a -> FormTree t v m [a]
+
 
 --------------------------------------------------------------------------------
 instance Monad m => Functor (FormTree t v m) where
@@ -114,6 +116,7 @@ showForm form = case form of
         ]
     (Map _ x)   -> "Map _" : map indent (showForm x)
     (Monadic x) -> "Monadic" : map indent (showForm $ runIdentity x)
+    (List r x) -> ["List " ++ show r, indent (show x)]
   where
     indent = ("  " ++)
 
@@ -136,6 +139,7 @@ toFormTree (Pure r x)  = return $ Pure r x
 toFormTree (App r x y) = liftM2 (App r) (toFormTree x) (toFormTree y)
 toFormTree (Map f x)   = liftM (Map f) (toFormTree x)
 toFormTree (Monadic x) = x >>= toFormTree >>= return . Monadic . Identity
+toFormTree (List r x)  = liftM (List r) (toFormTree x)
 
 
 --------------------------------------------------------------------------------
@@ -144,6 +148,7 @@ children (Pure _ _)    = []
 children (App _ x y)   = [SomeForm x, SomeForm y]
 children (Map _ x)     = children x
 children (Monadic x)   = children $ runIdentity x
+children (List _ x)    = children x
 
 
 --------------------------------------------------------------------------------
@@ -152,6 +157,7 @@ setRef r (Pure _ x)  = Pure r x
 setRef r (App _ x y) = App r x y
 setRef r (Map f x)   = Map f (setRef r x)
 setRef r (Monadic x) = Monadic $ liftM (setRef r) x
+setRef r (List _ x)  = List r x
 
 
 --------------------------------------------------------------------------------
@@ -167,6 +173,7 @@ getRef (Pure r _)  = r
 getRef (App r _ _) = r
 getRef (Map _ x)   = getRef x
 getRef (Monadic x) = getRef $ runIdentity x
+getRef (List r _)  = r
 
 
 --------------------------------------------------------------------------------
@@ -244,6 +251,15 @@ eval' context method env form = case form of
 
     Monadic x -> eval' context method env $ runIdentity x
 
+    List _ subform -> do
+      let go i = do
+            (result, inp) <- eval' (path ++ [T.pack $ show i]) method env subform
+            case result of
+              Error _ -> return []
+              Success _ -> go (succ i) >>= return . ([(result, inp)] ++)
+      results <- go (0 :: Int)
+      return (sequence $ map fst results, concatMap snd results)
+
   where
     path = context ++ maybeToList (getRef form)
 
@@ -255,6 +271,7 @@ formMapView f (Pure r x)  = Pure r $ (fieldMapView f) x
 formMapView f (App r x y) = App r (formMapView f x) (formMapView f y)
 formMapView f (Map g x)   = Map (g >=> return . resultMapError f) (formMapView f x)
 formMapView f (Monadic x) = formMapView f $ runIdentity x
+formMapView f (List r x)  = List r (formMapView f x)
 
 
 --------------------------------------------------------------------------------

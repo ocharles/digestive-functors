@@ -19,6 +19,7 @@ module Text.Digestive.Form
     , choiceWith'
     , bool
     , file
+    , listOf
 
       -- * Optional forms
     , optionalText
@@ -110,6 +111,11 @@ bool = Pure Nothing . Bool . fromMaybe False
 --------------------------------------------------------------------------------
 file :: Form v m (Maybe FilePath)
 file = Pure Nothing File
+
+
+--------------------------------------------------------------------------------
+listOf :: Form v m a -> Form v m [a]
+listOf = List Nothing
 
 
 --------------------------------------------------------------------------------
