@@ -88,6 +88,7 @@ data Method = Get | Post
 data FormInput
     = TextInput Text
     | FileInput FilePath
+    | Container Int
     deriving (Show)
 
 

@@ -27,7 +27,7 @@ module Text.Digestive.Form.Internal
 
 --------------------------------------------------------------------------------
 import           Control.Applicative    (Applicative(..))
-import           Control.Monad          (liftM, liftM2, (>=>))
+import           Control.Monad          (forM, liftM, liftM2, (>=>))
 import           Control.Monad.Identity (Identity(..))
 import           Data.Maybe             (maybeToList)
 import           Data.Monoid            (Monoid)
@@ -252,13 +252,14 @@ eval' context method env form = case form of
     Monadic x -> eval' context method env $ runIdentity x
 
     List _ subform -> do
-      let go i = do
-            (result, inp) <- eval' (path ++ [T.pack $ show i]) method env subform
-            case result of
-              Error _ -> return []
-              Success _ -> go (succ i) >>= return . ([(result, inp)] ++)
-      results <- go (0 :: Int)
-      return (sequence $ map fst results, concatMap snd results)
+      elems <- env path
+      case elems of
+        (Container n : _) -> do
+          results <- forM [0 .. pred n] $ \i ->
+            eval' (path ++ [T.pack $ show i]) method env subform
+          return (sequence $ map fst results, concatMap snd results)
+        [] -> return (pure [], [])
+        i -> error $ "Expected a Container, but got a " ++ show i
 
   where
     path = context ++ maybeToList (getRef form)
