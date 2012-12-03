@@ -32,6 +32,7 @@ import qualified Text.Blaze.Internal         as H
 
 
 --------------------------------------------------------------------------------
+import           Text.Digestive.Types (PathElement(Index, Path))
 import           Text.Digestive.View
 
 
@@ -194,4 +195,4 @@ inputList ref emptyCase view renderChild =
     mapM_ go [0 .. maybe emptyCase pred $ fieldInputElements ref view]
   where
     go i = renderChild $ subView (Index i) f
-    f = subView ref view
+    f = subView (Path ref) view
