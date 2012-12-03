@@ -30,12 +30,9 @@ import           Control.Applicative    (Applicative(..))
 import           Control.Monad          (forM, liftM, liftM2, (>=>))
 import           Control.Monad.Identity (Identity(..))
 import           Data.Maybe             (maybeToList)
-import           Data.Monoid            (Monoid)
-
-import           Data.Char (isDigit)
+import           Data.Monoid            (Monoid, mappend)
 
 --------------------------------------------------------------------------------
-import           Data.Text              (Text)
 import qualified Data.Text              as T
 
 
@@ -103,7 +100,7 @@ instance Show (SomeForm v m) where
 
 
 --------------------------------------------------------------------------------
-type Ref = Maybe Text
+type Ref = Maybe PathElement
 
 
 --------------------------------------------------------------------------------
@@ -163,7 +160,7 @@ setRef r (List _ x)  = List r x
 
 --------------------------------------------------------------------------------
 -- | Operator to set a name for a subform.
-(.:) :: Monad m => Text -> Form v m a -> Form v m a
+(.:) :: Monad m => PathElement -> Form v m a -> Form v m a
 (.:) = setRef . Just
 infixr 5 .:
 
@@ -181,19 +178,19 @@ getRef (List r _)  = r
 lookupForm :: Path -> FormTree Identity v m a -> [SomeForm v m]
 lookupForm path = go path . SomeForm
   where
-    go []       form            = [form]
-    go (r : rs) (SomeForm form)
+    go (ActualPath []) form = [form]
+    go p@(ActualPath (r:rs)) (SomeForm form) =
         -- TODO - This guard can be eliminated by pattern matching on a
         -- more descriptive Path.
-        | and (map isDigit (T.unpack r)) = go rs (SomeForm form)
-        | otherwise = case getRef form of
+        -- | and (map isDigit (T.unpack r)) = go rs (SomeForm form)
+      case getRef form of
         Just r'
             -- Note how we use `setRef Nothing` to strip the ref away. This is
             -- really important.
             | r == r' && null rs              -> [SomeForm $ setRef Nothing form]
-            | r == r'                         -> children form >>= go rs
+            | r == r'                         -> children form >>= go (ActualPath rs)
             | otherwise                       -> []
-        Nothing                               -> children form >>= go (r : rs)
+        Nothing                               -> children form >>= go p
 
 
 --------------------------------------------------------------------------------
@@ -228,7 +225,7 @@ ann path (Error x)   = Error [(path, x)]
 --------------------------------------------------------------------------------
 eval :: Monad m => Method -> Env m -> FormTree Identity v m a
      -> m (Result [(Path, v)] a, [(Path, FormInput)])
-eval = eval' []
+eval = eval' (ActualPath [])
 
 eval' :: Monad m => Path -> Method -> Env m -> FormTree Identity v m a
       -> m (Result [(Path, v)] a, [(Path, FormInput)])
@@ -262,13 +259,13 @@ eval' context method env form = case form of
       case elems of
         (Container n : _) -> do
           results <- forM [0 .. pred n] $ \i ->
-            eval' (path ++ [T.pack $ show i]) method env subform
+            eval' (path `mappend` ActualPath [Path $ T.pack $ show i]) method env subform
           return (sequence $ map fst results, (path, Container n) : concatMap snd results)
         [] -> return (pure [], [])
         i -> error $ "Expected a Container, but got a " ++ show i
 
   where
-    path = context ++ maybeToList (getRef form)
+    path = context `mappend` ActualPath (maybeToList $ getRef form)
 
 
 --------------------------------------------------------------------------------

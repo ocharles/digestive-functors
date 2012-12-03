@@ -39,6 +39,7 @@ module Text.Digestive.View
 import           Control.Arrow                (second)
 import           Control.Monad.Identity       (Identity)
 import           Data.List                    (isPrefixOf)
+import           Data.Monoid                  (mappend, mempty)
 import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 
@@ -78,7 +79,7 @@ instance Show v => Show (View v) where
 getForm :: Monad m => Text -> Form v m a -> m (View v)
 getForm name form = do
     form' <- toFormTree form
-    return $ View name [] form' [] [] Get
+    return $ View name mempty form' [] [] Get
 
 
 --------------------------------------------------------------------------------
@@ -86,16 +87,16 @@ postForm :: Monad m => Text -> Form v m a -> Env m -> m (View v, Maybe a)
 postForm name form env = do
     form' <- toFormTree form
     eval Post env' form' >>= \(r, inp) -> return $ case r of
-        Error errs -> (View name [] form' inp errs Post, Nothing)
-        Success x  -> (View name [] form' inp [] Post, Just x)
+        Error errs -> (View name mempty form' inp errs Post, Nothing)
+        Success x  -> (View name mempty form' inp [] Post, Just x)
   where
-    env' = env . (name :)
+    env' = env . mappend (ActualPath [Path name])
 
 
 --------------------------------------------------------------------------------
 subView :: Text -> View v -> View v
 subView ref (View name ctx form input errs method) =
-    View name (ctx ++ path) form input errs method
+    View name (ctx `mappend` path) form input errs method
   where
     path = toPath ref
 
@@ -104,7 +105,7 @@ subView ref (View name ctx form input errs method) =
 -- | Returns all immediate subviews of a view
 subViews :: View v -> [View v]
 subViews view@(View _ ctx form _ _ _) =
-    [subView r view | f <- lookupForm ctx form, r <- go f]
+    [subView (fromPath $ ActualPath [r]) view | f <- lookupForm ctx form, r <- go f]
   where
     go (SomeForm f) = case getRef f of
         Nothing -> [r | c <- children f, r <- go c]
@@ -114,7 +115,8 @@ subViews view@(View _ ctx form _ _ _) =
 --------------------------------------------------------------------------------
 -- | Determine an absolute 'Path' for a field in the form
 absolutePath :: Text -> View v -> Path
-absolutePath ref view@(View name _ _ _ _ _) = name : viewPath ref view
+absolutePath ref view@(View name _ _ _ _ _) =
+  ActualPath [Path name] `mappend` viewPath ref view
 
 
 --------------------------------------------------------------------------------
@@ -128,7 +130,7 @@ absoluteRef ref view = fromPath $ absolutePath ref view
 -- | Internal version of 'absolutePath' which does not take the form name into
 -- account
 viewPath :: Text -> View v -> Path
-viewPath ref (View _ ctx _ _ _ _) = ctx ++ toPath ref
+viewPath ref (View _ ctx _ _ _ _) = ctx `mappend` toPath ref
 
 
 --------------------------------------------------------------------------------
@@ -158,14 +160,14 @@ fieldInputText ref view@(View _ _ form input _ method) =
 
 --------------------------------------------------------------------------------
 -- | Returns a list of (identifier, view, selected?)
-fieldInputChoice :: forall v. Text -> View v -> [(Text, v, Bool)]
+fieldInputChoice :: Text -> View v -> [(PathElement, v, Bool)]
 fieldInputChoice ref view@(View _ _ form input _ method) =
     queryField path form eval'
   where
     path       = viewPath ref view
     givenInput = lookupInput path input
 
-    eval' :: Field v b -> [(Text, v, Bool)]
+    eval' :: Field v b -> [(PathElement, v, Bool)]
     eval' field = case field of
         Choice xs didx ->
             let idx = snd $ evalField method givenInput (Choice xs didx)
@@ -206,7 +208,7 @@ fieldInputFile ref view@(View _ _ form input _ method) =
 
 --------------------------------------------------------------------------------
 fieldInputElements :: Text -> View v -> Maybe Int
-fieldInputElements ref view@(View _ _ form input _ method) =
+fieldInputElements ref view@(View _ _ _ input _ _) =
     case givenInput of
       (Container n : _) -> Just n
       _ -> Nothing
@@ -224,4 +226,4 @@ errors ref view = map snd $ filter ((== viewPath ref view) . fst) $
 --------------------------------------------------------------------------------
 childErrors :: Text -> View v -> [v]
 childErrors ref view = map snd $
-    filter ((viewPath ref view `isPrefixOf`) . fst) $ viewErrors view
+    filter ((pathComponents (viewPath ref view) `isPrefixOf`) . pathComponents . fst) $ viewErrors view

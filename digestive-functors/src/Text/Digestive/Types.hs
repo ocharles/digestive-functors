@@ -1,9 +1,17 @@
+{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 --------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 module Text.Digestive.Types
     ( Result (..)
     , resultMapError
-    , Path
+    , Path(..)
+    , PathElement(..)
+    , pathComponents
     , toPath
     , fromPath
     , Method (..)
@@ -14,8 +22,9 @@ module Text.Digestive.Types
 
 --------------------------------------------------------------------------------
 import           Control.Applicative (Applicative(..))
-import           Data.Monoid         (Monoid, mappend)
-
+import           Data.Char           (isDigit)
+import           Data.Monoid         (Monoid(..), mappend)
+import           Data.String
 
 --------------------------------------------------------------------------------
 import           Data.Text           (Text)
@@ -62,19 +71,42 @@ resultMapError _ (Success x) = Success x
 
 --------------------------------------------------------------------------------
 -- | Describes a path to a subform
-type Path = [Text]
+data Path = ActualPath [PathElement]
+  deriving (Eq, Show)
+
+instance Monoid Path where
+  mempty = ActualPath []
+  mappend (ActualPath a) (ActualPath b) = ActualPath (a ++ b)
+
+pathComponents :: Path -> [PathElement]
+pathComponents (ActualPath p) = p
+
+
+--------------------------------------------------------------------------------
+-- | Describes a single element of a 'Path'.
+data PathElement = Path Text
+  deriving (Eq, Show)
+
+instance IsString PathElement where
+  fromString = Path . fromString
 
 
 --------------------------------------------------------------------------------
 -- | Create a 'Path' from some text
 toPath :: Text -> Path
-toPath = filter (not . T.null) . T.split (== '.')
+toPath = ActualPath . map toPathElement . filter (not . T.null) . T.split (== '.')
+  where
+    toPathElement p
+      | and (map isDigit $ T.unpack p) = Path p
+      | otherwise                      = Path p
 
 
 --------------------------------------------------------------------------------
 -- | Serialize a 'Path' to 'Text'
 fromPath :: Path -> Text
-fromPath = T.intercalate "."
+fromPath = T.intercalate "." . map pathComponent . pathComponents
+  where
+    pathComponent (Path p) = p
 
 
 --------------------------------------------------------------------------------
