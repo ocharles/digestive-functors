@@ -32,6 +32,7 @@ import           Control.Monad.Identity (Identity(..))
 import           Data.Maybe             (maybeToList)
 import           Data.Monoid            (Monoid, mappend)
 
+
 --------------------------------------------------------------------------------
 import qualified Data.Text              as T
 
@@ -178,24 +179,22 @@ getRef (List r _)  = r
 lookupForm :: Path -> FormTree Identity v m a -> [SomeForm v m]
 lookupForm path = go path . SomeForm
   where
-    go (ActualPath []) form = [form]
-    go (MetaPath []) form   = [form]
+    go p form = case pathComponents p of
+      [] -> [form]
 
-    -- If something is indexed, we just skip the index part and carry on with
-    -- the rest of the form.
-    go (MetaPath (Index _ : rs)) form = go (ActualPath rs) form
+      -- If something is indexed, we just skip the index part and carry on with
+      -- the rest of the form.
+      (Index _ : rs) -> go (ActualPath rs) form
 
-    go p (SomeForm form) =
-      case getRef form of
-        Just r'
+      (r:rs) -> case form of
+        SomeForm f -> case getRef f of
+          Just r'
             -- Note how we use `setRef Nothing` to strip the ref away. This is
             -- really important.
-            | r == r' && null rs              -> [SomeForm $ setRef Nothing form]
-            | r == r'                         -> children form >>= go (ActualPath rs)
+            | r == r' && null rs              -> [SomeForm $ setRef Nothing f]
+            | r == r'                         -> children f >>= go (ActualPath rs)
             | otherwise                       -> []
-        Nothing                               -> children form >>= go p
-      where (r:rs) = pathComponents p
-
+          Nothing                               -> children f >>= go p
 
 --------------------------------------------------------------------------------
 toField :: FormTree Identity v m a -> Maybe (SomeField v)
