@@ -179,7 +179,13 @@ lookupForm :: Path -> FormTree Identity v m a -> [SomeForm v m]
 lookupForm path = go path . SomeForm
   where
     go (ActualPath []) form = [form]
-    go p@(ActualPath (r:rs)) (SomeForm form) =
+    go (MetaPath []) form   = [form]
+
+    -- If something is indexed, we just skip the index part and carry on with
+    -- the rest of the form.
+    go (MetaPath (Index _ : rs)) form = go (ActualPath rs) form
+
+    go p (SomeForm form) =
         -- TODO - This guard can be eliminated by pattern matching on a
         -- more descriptive Path.
         -- | and (map isDigit (T.unpack r)) = go rs (SomeForm form)
@@ -191,6 +197,7 @@ lookupForm path = go path . SomeForm
             | r == r'                         -> children form >>= go (ActualPath rs)
             | otherwise                       -> []
         Nothing                               -> children form >>= go p
+      where (r:rs) = pathComponents p
 
 
 --------------------------------------------------------------------------------
