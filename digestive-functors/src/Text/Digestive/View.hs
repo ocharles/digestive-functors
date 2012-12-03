@@ -27,6 +27,7 @@ module Text.Digestive.View
     , fieldInputChoice
     , fieldInputBool
     , fieldInputFile
+    , fieldInputElements
 
       -- ** Errors
     , errors
@@ -201,6 +202,17 @@ fieldInputFile ref view@(View _ _ form input _ method) =
         File -> evalField method givenInput File
         f    -> error $ T.unpack ref ++ ": expected (File), " ++
             "but got: (" ++ show f ++ ")"
+
+
+--------------------------------------------------------------------------------
+fieldInputElements :: Text -> View v -> Maybe Int
+fieldInputElements ref view@(View _ _ form input _ method) =
+    case givenInput of
+      (Container n : _) -> Just n
+      _ -> Nothing
+  where
+    path       = viewPath ref view
+    givenInput = lookupInput path input
 
 
 --------------------------------------------------------------------------------

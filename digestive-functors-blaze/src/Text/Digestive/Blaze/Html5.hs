@@ -11,6 +11,7 @@ module Text.Digestive.Blaze.Html5
     , inputCheckbox
     , inputFile
     , inputSubmit
+    , inputList
     , label
     , form
     , errorList
@@ -24,6 +25,7 @@ import           Data.Maybe                  (fromMaybe)
 import           Data.Monoid                 (mappend, mempty)
 import           Data.Text                   (Text)
 import           Text.Blaze.Html             (Html, (!))
+import qualified Data.Text                   as T
 import qualified Text.Blaze.Html5            as H
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Text.Blaze.Internal         as H
@@ -184,3 +186,12 @@ childErrorList ref view = case childErrors ref view of
     []   -> mempty
     errs -> H.ul ! A.class_ "digestive-functors-error-list" $ forM_ errs $ \e ->
         H.li ! A.class_ "digestive-functors-error" $ e
+
+
+--------------------------------------------------------------------------------
+inputList :: Text -> Int -> View Html -> (View Html -> Html) -> Html
+inputList ref emptyCase view renderChild =
+    mapM_ go [0 .. maybe emptyCase pred $ fieldInputElements ref view]
+  where
+    go i = renderChild $ subView (T.pack $ show i) f
+    f = subView ref view

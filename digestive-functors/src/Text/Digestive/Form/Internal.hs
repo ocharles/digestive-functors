@@ -32,6 +32,7 @@ import           Control.Monad.Identity (Identity(..))
 import           Data.Maybe             (maybeToList)
 import           Data.Monoid            (Monoid)
 
+import           Data.Char (isDigit)
 
 --------------------------------------------------------------------------------
 import           Data.Text              (Text)
@@ -116,7 +117,7 @@ showForm form = case form of
         ]
     (Map _ x)   -> "Map _" : map indent (showForm x)
     (Monadic x) -> "Monadic" : map indent (showForm $ runIdentity x)
-    (List r x) -> ["List " ++ show r, indent (show x)]
+    (List r x) -> ["List (" ++ show r ++ ")", indent (show x)]
   where
     indent = ("  " ++)
 
@@ -148,7 +149,7 @@ children (Pure _ _)    = []
 children (App _ x y)   = [SomeForm x, SomeForm y]
 children (Map _ x)     = children x
 children (Monadic x)   = children $ runIdentity x
-children (List _ x)    = children x
+children (List _ x)    = [SomeForm x]
 
 
 --------------------------------------------------------------------------------
@@ -181,22 +182,27 @@ lookupForm :: Path -> FormTree Identity v m a -> [SomeForm v m]
 lookupForm path = go path . SomeForm
   where
     go []       form            = [form]
-    go (r : rs) (SomeForm form) = case getRef form of
+    go (r : rs) (SomeForm form)
+        -- TODO - This guard can be eliminated by pattern matching on a
+        -- more descriptive Path.
+        | and (map isDigit (T.unpack r)) = go rs (SomeForm form)
+        | otherwise = case getRef form of
         Just r'
             -- Note how we use `setRef Nothing` to strip the ref away. This is
             -- really important.
-            | r == r' && null rs -> [SomeForm $ setRef Nothing form]
-            | r == r'            -> children form >>= go rs
-            | otherwise          -> []
-        Nothing                  -> children form >>= go (r : rs)
+            | r == r' && null rs              -> [SomeForm $ setRef Nothing form]
+            | r == r'                         -> children form >>= go rs
+            | otherwise                       -> []
+        Nothing                               -> children form >>= go (r : rs)
 
 
 --------------------------------------------------------------------------------
 toField :: FormTree Identity v m a -> Maybe (SomeField v)
 toField (Pure _ x)  = Just (SomeField x)
+toField (App _ _ _) = Nothing
 toField (Map _ x)   = toField x
 toField (Monadic x) = toField (runIdentity x)
-toField _           = Nothing
+toField (List _ x)  = toField x
 
 
 --------------------------------------------------------------------------------
@@ -257,7 +263,7 @@ eval' context method env form = case form of
         (Container n : _) -> do
           results <- forM [0 .. pred n] $ \i ->
             eval' (path ++ [T.pack $ show i]) method env subform
-          return (sequence $ map fst results, concatMap snd results)
+          return (sequence $ map fst results, (path, Container n) : concatMap snd results)
         [] -> return (pure [], [])
         i -> error $ "Expected a Container, but got a " ++ show i
 
