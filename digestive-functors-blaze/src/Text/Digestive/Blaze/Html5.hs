@@ -193,5 +193,5 @@ inputList :: Text -> Int -> View Html -> (View Html -> Html) -> Html
 inputList ref emptyCase view renderChild =
     mapM_ go [0 .. maybe emptyCase pred $ fieldInputElements ref view]
   where
-    go i = renderChild $ subView (T.pack $ show i) f
+    go i = renderChild $ subView (Index i) f
     f = subView ref view
