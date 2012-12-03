@@ -186,9 +186,6 @@ lookupForm path = go path . SomeForm
     go (MetaPath (Index _ : rs)) form = go (ActualPath rs) form
 
     go p (SomeForm form) =
-        -- TODO - This guard can be eliminated by pattern matching on a
-        -- more descriptive Path.
-        -- | and (map isDigit (T.unpack r)) = go rs (SomeForm form)
       case getRef form of
         Just r'
             -- Note how we use `setRef Nothing` to strip the ref away. This is
