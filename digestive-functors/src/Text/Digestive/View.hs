@@ -94,18 +94,16 @@ postForm name form env = do
 
 
 --------------------------------------------------------------------------------
-subView :: Text -> View v -> View v
+subView :: PathElement -> View v -> View v
 subView ref (View name ctx form input errs method) =
-    View name (ctx `mappend` path) form input errs method
-  where
-    path = toPath ref
+    View name (ctx `mappend` ActualPath [ref]) form input errs method
 
 
 --------------------------------------------------------------------------------
 -- | Returns all immediate subviews of a view
 subViews :: View v -> [View v]
 subViews view@(View _ ctx form _ _ _) =
-    [subView (fromPath $ ActualPath [r]) view | f <- lookupForm ctx form, r <- go f]
+    [subView r view | f <- lookupForm ctx form, r <- go f]
   where
     go (SomeForm f) = case getRef f of
         Nothing -> [r | c <- children f, r <- go c]
