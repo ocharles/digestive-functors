@@ -71,20 +71,24 @@ resultMapError _ (Success x) = Success x
 
 --------------------------------------------------------------------------------
 -- | Describes a path to a subform
-data Path = ActualPath [PathElement]
+data Path = ActualPath [PathElement] | MetaPath [PathElement]
   deriving (Eq, Show)
 
 instance Monoid Path where
   mempty = ActualPath []
   mappend (ActualPath a) (ActualPath b) = ActualPath (a ++ b)
+  mappend (MetaPath a) (MetaPath b) = MetaPath (a ++ b)
+  mappend (ActualPath a) (MetaPath b) = MetaPath (a ++ b)
+  mappend (MetaPath a) (ActualPath b) = ActualPath (a ++ b)
 
 pathComponents :: Path -> [PathElement]
 pathComponents (ActualPath p) = p
+pathComponents (MetaPath p) = p
 
 
 --------------------------------------------------------------------------------
 -- | Describes a single element of a 'Path'.
-data PathElement = Path Text
+data PathElement = Path Text | Index Int
   deriving (Eq, Show)
 
 instance IsString PathElement where
@@ -96,9 +100,9 @@ instance IsString PathElement where
 toPath :: Text -> Path
 toPath = ActualPath . map toPathElement . filter (not . T.null) . T.split (== '.')
   where
-    toPathElement p
-      | and (map isDigit $ T.unpack p) = Path p
-      | otherwise                      = Path p
+    toPathElement p = let s = T.unpack p
+                      in if and (map isDigit s) then Index (read s)
+                         else Path p
 
 
 --------------------------------------------------------------------------------
@@ -107,6 +111,7 @@ fromPath :: Path -> Text
 fromPath = T.intercalate "." . map pathComponent . pathComponents
   where
     pathComponent (Path p) = p
+    pathComponent (Index i) = T.pack $ show i
 
 
 --------------------------------------------------------------------------------

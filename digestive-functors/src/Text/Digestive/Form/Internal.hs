@@ -259,13 +259,17 @@ eval' context method env form = case form of
       case elems of
         (Container n : _) -> do
           results <- forM [0 .. pred n] $ \i ->
-            eval' (path `mappend` ActualPath [Path $ T.pack $ show i]) method env subform
+            eval' (path `mappend` ActualPath [Index i]) method env subform
           return (sequence $ map fst results, (path, Container n) : concatMap snd results)
         [] -> return (pure [], [])
         i -> error $ "Expected a Container, but got a " ++ show i
 
   where
-    path = context `mappend` ActualPath (maybeToList $ getRef form)
+    path = context `mappend` localPath
+    localPath = let construct = case form of
+                      List _ _ -> MetaPath
+                      _        -> ActualPath
+                 in construct (maybeToList $ getRef form)
 
 
 --------------------------------------------------------------------------------
