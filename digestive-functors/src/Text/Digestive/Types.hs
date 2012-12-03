@@ -11,6 +11,7 @@ module Text.Digestive.Types
     , resultMapError
     , Path(..)
     , PathElement(..)
+    , unPathElement
     , pathComponents
     , toPath
     , fromPath
@@ -94,6 +95,10 @@ data PathElement = Path Text | Index Int
 instance IsString PathElement where
   fromString = Path . fromString
 
+
+unPathElement :: PathElement -> Text
+unPathElement (Path t) = t
+unPathElement (Index i) = T.pack $ show i
 
 --------------------------------------------------------------------------------
 -- | Create a 'Path' from some text

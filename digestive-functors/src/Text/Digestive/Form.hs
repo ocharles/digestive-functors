@@ -74,14 +74,14 @@ stringRead err = transform (readTransform err) . string . fmap show
 
 --------------------------------------------------------------------------------
 choice :: (Eq a, Monad m) => [(a, v)] -> Formlet v m a
-choice items def = choiceWith (zip makeRefs items) def
+choice items def = choiceWith (zip (map unPathElement makeRefs) items) def
 
 
 --------------------------------------------------------------------------------
 -- | Sometimes there is no good 'Eq' instance for 'choice'. In this case, you
 -- can use this function, which takes an index in the list as default.
 choice' :: Monad m => [(a, v)] -> Maybe Int -> Form v m a
-choice' items def = choiceWith' (zip makeRefs items) def
+choice' items def = choiceWith' (zip (map unPathElement makeRefs) items) def
 
 
 --------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ choice' items def = choiceWith' (zip makeRefs items) def
 -- resulting HTML instead of the default @[0 ..]@. This fixes some race
 -- conditions that might otherwise appear, e.g. if new choice items are added to
 -- some database while a user views and submits the form...
-choiceWith :: (Eq a, Monad m) => [(PathElement, (a, v))] -> Formlet v m a
+choiceWith :: (Eq a, Monad m) => [(Text, (a, v))] -> Formlet v m a
 choiceWith items def = choiceWith' items def'
   where
     def' = def >>= (\d -> findIndex ((== d) . fst . snd) items)
@@ -97,7 +97,7 @@ choiceWith items def = choiceWith' items def'
 
 --------------------------------------------------------------------------------
 -- | A version of 'choiceWith' for when you have no good 'Eq' instance.
-choiceWith' :: Monad m => [(PathElement, (a, v))] -> Maybe Int -> Form v m a
+choiceWith' :: Monad m => [(Text, (a, v))] -> Maybe Int -> Form v m a
 choiceWith' items def = fmap fst $ Pure Nothing $ Choice items def'
   where
     def' = fromMaybe 0 def

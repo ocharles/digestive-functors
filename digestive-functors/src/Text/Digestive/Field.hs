@@ -29,7 +29,7 @@ data Field v a where
     -- A list of identifier, value, view. Then we have the default index in
     -- the list. The return value has the actual value as well as the index in
     -- the list.
-    Choice    :: [(PathElement, (a, v))] -> Int -> Field v (a, Int)
+    Choice    :: [(Text, (a, v))] -> Int -> Field v (a, Int)
     Bool      :: Bool -> Field v Bool
     File      :: Field v (Maybe FilePath)
 
@@ -59,7 +59,7 @@ evalField _    (TextInput x : _) (Choice ls y) =
     fromMaybe (fst (snd (ls !! y)), y) $ do
         -- Expects input in the form of "foo.bar.2". This is not needed for
         -- <select> fields, but we need it for labels for radio buttons.
-        t      <- listToMaybe $ reverse $ pathComponents $ toPath x
+        t      <- listToMaybe $ map unPathElement $ reverse $ pathComponents $ toPath x
         (c, i) <- lookupIdx t ls
         return (fst c, i)
 evalField _    _                 (Choice ls x) = (fst (snd (ls !! x)), x)

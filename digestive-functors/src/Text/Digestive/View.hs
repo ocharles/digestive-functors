@@ -160,14 +160,14 @@ fieldInputText ref view@(View _ _ form input _ method) =
 
 --------------------------------------------------------------------------------
 -- | Returns a list of (identifier, view, selected?)
-fieldInputChoice :: Text -> View v -> [(PathElement, v, Bool)]
+fieldInputChoice :: Text -> View v -> [(Text, v, Bool)]
 fieldInputChoice ref view@(View _ _ form input _ method) =
     queryField path form eval'
   where
     path       = viewPath ref view
     givenInput = lookupInput path input
 
-    eval' :: Field v b -> [(PathElement, v, Bool)]
+    eval' :: Field v b -> [(Text, v, Bool)]
     eval' field = case field of
         Choice xs didx ->
             let idx = snd $ evalField method givenInput (Choice xs didx)
