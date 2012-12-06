@@ -15,7 +15,6 @@ import Data.Maybe (catMaybes, fromMaybe)
 import System.Directory (copyFile, getTemporaryDirectory)
 import System.FilePath (takeFileName, (</>))
 import qualified Data.Map as M
-import qualified Data.Set as Set
 
 
 --------------------------------------------------------------------------------
@@ -61,6 +60,8 @@ defaultSnapFormConfig = SnapFormConfig
 
 --------------------------------------------------------------------------------
 snapEnv :: Snap.MonadSnap m => [(Text, FilePath)] -> Env m
+
+-- This attempts to look up exact values from the environment
 snapEnv allFiles path@(ActualPath _) = do
     inputs <- map (TextInput . T.decodeUtf8) . findParams <$> Snap.getParams
     let files = map (FileInput . snd) $ filter ((== name) . fst) allFiles
@@ -69,11 +70,17 @@ snapEnv allFiles path@(ActualPath _) = do
     findParams = fromMaybe [] . M.lookup (T.encodeUtf8 name)
     name       = fromPath path
 
+-- This attempts to lookup a 'MetaPath', which indicates a container
 snapEnv allFiles path@(MetaPath _) = do
-    return . Container . Set.size . Set.fromList . filter prefixMatch . M.keys <$> Snap.getParams
+    let filePaths = map fst allFiles
+    fieldPaths <- map T.decodeUtf8 . M.keys <$> Snap.getParams
+    return $ return . Container . pred . length . catMaybes . map mapIndex $
+      fieldPaths ++ filePaths
   where
-    formattedPath = T.encodeUtf8 $ T.append (fromPath path) "."
-    prefixMatch f = formattedPath `B.isPrefixOf` f
+    formattedPath = T.append (fromPath path) "."
+    mapIndex f = case T.stripPrefix formattedPath f of
+      Just t | not (T.null t) -> Just $ fst (T.breakOn "." t)
+      _                       -> Nothing
 
 
 --------------------------------------------------------------------------------

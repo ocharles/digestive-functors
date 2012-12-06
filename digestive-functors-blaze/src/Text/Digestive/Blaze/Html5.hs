@@ -192,7 +192,7 @@ childErrorList ref view = case childErrors ref view of
 --------------------------------------------------------------------------------
 inputList :: Text -> Int -> View Html -> (View Html -> Html) -> Html
 inputList ref emptyCase view renderChild =
-    mapM_ go [0 .. maybe emptyCase pred $ fieldInputElements ref view]
+    mapM_ go [0 .. maybe (pred emptyCase) pred $ fieldInputElements ref view]
   where
     go i = renderChild $ subView (Index i) f
     f = subView (Path ref) view
